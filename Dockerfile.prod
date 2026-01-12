@@ -3,7 +3,7 @@
 # ================================
 
 # Stage 1: Builder
-FROM php:8.2-fpm-alpine AS builder
+FROM php:8.4-fpm-alpine AS builder
 
 # Install system dependencies and PHP extensions
 RUN apk add --no-cache \
@@ -52,9 +52,9 @@ RUN composer dump-autoload --optimize --classmap-authoritative
 # ================================
 # Stage 2: Production Image
 # ================================
-FROM php:8.2-fpm-alpine
+FROM php:8.4-fpm-alpine
 
-# Install runtime dependencies only
+# Install dependencies and compile extensions
 RUN apk add --no-cache \
     postgresql-libs \
     libzip \
@@ -64,6 +64,14 @@ RUN apk add --no-cache \
     shadow \
     supervisor \
     nginx \
+    && apk add --no-cache --virtual .build-deps \
+    postgresql-dev \
+    libzip-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    linux-headers \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo_pgsql \
     pgsql \
@@ -71,7 +79,8 @@ RUN apk add --no-cache \
     zip \
     opcache \
     pcntl \
-    bcmath
+    bcmath \
+    && apk del .build-deps
 
 # Copy PHP configuration
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini

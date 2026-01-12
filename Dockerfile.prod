@@ -46,7 +46,7 @@ RUN composer install \
     --optimize-autoloader
 
 # Install JS dependencies
-RUN npm ci
+RUN npm install
 
 # Copy application code
 COPY . .

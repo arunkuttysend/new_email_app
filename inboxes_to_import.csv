@@ -1,0 +1,5 @@
+email,imap_host,imap_port,imap_password,smtp_host,smtp_port,smtp_password,smtp_encryption,first_name,last_name
+oliver.smith@strategicinsightpro.com,inbound-1.mrfrmarket.com,993,Logit@2026$1,smtpmail.lead-mailing.com,587,MXuGq983mSOGM45BAHwchM96,tls,Oliver,Smith
+oliver.johnson@strategicinsightpro.com,inbound-1.mrfrmarket.com,993,Logit@2026$1,smtpmail.lead-mailing.com,587,wqhwWnpSkAIeituw4Iv3dBe6,tls,Oliver,Johnson
+oliver.williams@strategicinsightpro.com,inbound-1.mrfrmarket.com,993,Logit@2026$1,smtpmail.lead-mailing.com,587,YJGvF6YclnLNAayuwXt6jBHR,tls,Oliver,Williams
+oliver.brown@strategicinsightpro.com,inbound-1.mrfrmarket.com,993,Logit@2026$1,smtpmail.lead-mailing.com,587,dznwIz5RpHfXtj3QN6expISk,tls,Oliver,Brown

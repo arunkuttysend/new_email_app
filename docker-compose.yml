@@ -1,0 +1,58 @@
+services:
+    db:
+        image: postgres:15
+        container_name: email-platform-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_DATABASE:-email_platform}
+            POSTGRES_USER: ${DB_USERNAME:-postgres}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+        volumes:
+            - email-platform-db-data:/var/lib/postgresql/data
+        ports:
+            - "5432:5432"
+        networks:
+            - email-platform-network
+
+    redis:
+        image: redis:alpine
+        container_name: email-platform-redis
+        restart: unless-stopped
+        volumes:
+            - email-platform-redis-data:/data
+        ports:
+            - "6379:6379"
+        networks:
+            - email-platform-network
+
+    meilisearch:
+        image: getmeili/meilisearch:v1.6
+        container_name: email-platform-meilisearch
+        restart: unless-stopped
+        environment:
+            MEILI_MASTER_KEY: ${MEILISEARCH_KEY:-masterKey}
+        ports:
+            - "7700:7700"
+        volumes:
+            - email-platform-meili-data:/meili_data
+        networks:
+            - email-platform-network
+
+    mailpit:
+        image: axllent/mailpit
+        container_name: email-platform-mailpit
+        restart: unless-stopped
+        ports:
+            - "8025:8025"
+            - "1025:1025"
+        networks:
+            - email-platform-network
+
+networks:
+  email-platform-network:
+    driver: bridge
+
+volumes:
+  email-platform-db-data:
+  email-platform-redis-data:
+  email-platform-meili-data:

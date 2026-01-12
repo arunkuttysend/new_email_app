@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # PHP Application (handles FPM)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: email-platform-app:latest
+    container_name: email_platform_app
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./storage:/app/storage # Persist storage logs/cache
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - app-network
+
+  # Web Server
+  nginx:
+    image: nginx:alpine
+    container_name: email_platform_nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:80"
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./public:/app/public # Map public assets
+    depends_on:
+      - app
+    networks:
+      - app-network
+
+  # Background Workers (Queue & Schedule)
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: email-platform-worker:latest
+    container_name: email_platform_worker
+    restart: unless-stopped
+    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+    env_file: .env
+    volumes:
+      - ./docker/supervisor/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+      - ./storage:/app/storage
+    depends_on:
+      - app
+      - redis
+      - postgres
+    networks:
+      - app-network
+
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: email_platform_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-email_platform}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  # Redis Cache
+  redis:
+    image: redis:alpine
+    container_name: email_platform_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

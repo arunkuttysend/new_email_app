@@ -1,3 +1,20 @@
+@section('css')
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/trix@2.0.8/dist/trix.css">
+    <style>
+        .trix-content {
+            min-height: 250px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        /* Hide file upload button since we don't support attachments in Trix yet */
+        trix-toolbar .trix-button--icon-attach { display: none; }
+    </style>
+@stop
+
+@section('js')
+    <script type="text/javascript" src="https://unpkg.com/trix@2.0.8/dist/trix.umd.min.js"></script>
+@stop
+
 <div>
     <div class="row justify-content-center">
         <div class="col-md-10">
@@ -84,7 +101,7 @@
                         </div>
 
                         @foreach($steps as $index => $s)
-                            <div class="card {{ $index == 0 ? 'card-primary card-outline' : 'card-secondary mb-3' }}">
+                            <div class="card {{ $index == 0 ? 'card-primary card-outline' : 'card-secondary mb-3' }}" wire:key="step-card-{{ $index }}">
                                 <div class="card-header">
                                     <h3 class="card-title">
                                         @if($index == 0)
@@ -126,27 +143,49 @@
                                             </div>
                                             
                                             <div class="form-group" x-data="{
+                                                value: @entangle('steps.' . $index . '.content'),
+                                                isFocused: false,
                                                 insertTag(tag) {
-                                                    let textarea = $refs.emailContent;
-                                                    let start = textarea.selectionStart;
-                                                    let end = textarea.selectionEnd;
-                                                    let text = textarea.value;
-                                                    let before = text.substring(0, start);
-                                                    let after = text.substring(end, text.length);
+                                                     const editor = this.$refs.trix.editor;
+                                                     editor.insertString(tag);
+                                                },
+                                                init() {
+                                                    let trix = this.$refs.trix;
                                                     
-                                                    // Update value and trigger Livewire
-                                                    textarea.value = before + tag + after;
-                                                    textarea.dispatchEvent(new Event('input'));
-                                                    
-                                                    // Restore focus
-                                                    $nextTick(() => {
-                                                        textarea.focus();
-                                                        textarea.setSelectionRange(start + tag.length, start + tag.length);
+                                                    // Update Livewire on change
+                                                    trix.addEventListener('trix-change', (e) => {
+                                                        this.value = e.target.value;
+                                                    });
+
+                                                    // Watch for external changes (e.g. loading saved draft)
+                                                    this.$watch('value', (newValue) => {
+                                                        if (document.activeElement !== trix) {
+                                                            // Only update if not currently typing to avoid cursor jumps
+                                                            // Check if content is different to avoid loops
+                                                            if(trix.editor.getDocument().toString().trim() !== newValue.replace(/<[^>]*>?/gm, '').trim()) {
+                                                                 // This is a rough check. Ideally use editor.loadHTML(newValue)
+                                                                 // but Trix doesn't like being updated while focused.
+                                                                 // Since we mostly start empty or load once, this is okay for now.
+                                                                 if (!this.isFocused) {
+                                                                     trix.editor.loadHTML(newValue);
+                                                                 }
+                                                            }
+                                                        }
                                                     });
                                                 }
-                                            }">
-                                                <label>Email Body (HTML)</label>
-                                                <textarea x-ref="emailContent" wire:model.live.debounce.300ms="steps.{{ $index }}.content" class="form-control font-monospace text-sm" rows="12" placeholder="Hi {first_name}, ..."></textarea>
+                                            }" wire:ignore>
+                                                <label>Email Body</label>
+                                                
+                                                <trix-editor 
+                                                    x-ref="trix" 
+                                                    input="x-content-{{ $index }}" 
+                                                    class="trix-content"
+                                                    @focus="isFocused = true"
+                                                    @blur="isFocused = false"
+                                                ></trix-editor>
+                                                
+                                                <input id="x-content-{{ $index }}" type="hidden" :value="value">
+                                                
                                                 <div class="mt-2">
                                                     <small class="text-muted">Available tags (click to insert):</small>
                                                     <div class="d-flex flex-wrap mt-1">
@@ -168,28 +207,46 @@
                                             <div class="card shadow-sm">
                                                 <div class="card-header bg-light py-2">
                                                     <small class="text-muted">Subject:</small> 
-                                                    <strong class="text-dark">{{ $steps[$index]['subject'] ?: '(No Subject)' }}</strong>
+                                                    <strong class="text-dark">
+                                                        @php
+                                                            $previewSubject = $steps[$index]['subject'] ?: '(No Subject)';
+                                                            $replacements = [
+                                                                '{first_name}' => '<span class="bg-warning px-1 rounded">John</span>',
+                                                                '{last_name}' => '<span class="bg-warning px-1 rounded">Doe</span>',
+                                                                '{company}' => '<span class="bg-warning px-1 rounded">Acme Corp</span>',
+                                                                '{email}' => '<span class="bg-warning px-1 rounded">john@example.com</span>',
+                                                                '{unsubscribe_url}' => '<a href="#">Unsubscribe</a>',
+                                                            ];
+                                                            
+                                                            // Simplified replacements for subject (no HTML tags)
+                                                            $subjectReplacements = [
+                                                                '{first_name}' => 'John',
+                                                                '{last_name}' => 'Doe',
+                                                                '{company}' => 'Acme Corp',
+                                                                '{email}' => 'john@example.com',
+                                                            ];
+                                                            
+                                                            foreach ($subjectReplacements as $tag => $val) {
+                                                                $previewSubject = str_ireplace($tag, $val, $previewSubject);
+                                                            }
+                                                        @endphp
+                                                        {{ $previewSubject }}
+                                                    </strong>
                                                 </div>
                                                 <div class="card-body p-4" style="min-height: 300px; background: #fff;">
                                                     {{-- Simulate Email Body --}}
-                                                    <div class="email-content text-break">
+                                                    {{-- Trix uses normal HTML output so we can just render it, replacing tags --}}
+                                                    <div class="email-content text-break trix-content">
                                                         @if(empty($steps[$index]['content']))
                                                             <p class="text-muted text-center italic mt-5">Start typing to see preview...</p>
                                                         @else
                                                             @php
                                                                 $previewContent = $steps[$index]['content'];
-                                                                $replacements = [
-                                                                    '{first_name}' => '<span class="bg-warning px-1 rounded">John</span>',
-                                                                    '{last_name}' => '<span class="bg-warning px-1 rounded">Doe</span>',
-                                                                    '{company}' => '<span class="bg-warning px-1 rounded">Acme Corp</span>',
-                                                                    '{email}' => '<span class="bg-warning px-1 rounded">john@example.com</span>',
-                                                                    '{unsubscribe_url}' => '<a href="#">Unsubscribe</a>',
-                                                                ];
                                                                 foreach ($replacements as $tag => $val) {
                                                                     $previewContent = str_ireplace($tag, $val, $previewContent);
                                                                 }
                                                             @endphp
-                                                            {!! nl2br($previewContent) !!}
+                                                            {!! $previewContent !!}
                                                         @endif
                                                     </div>
                                                 </div>

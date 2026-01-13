@@ -18,20 +18,23 @@ services:
     networks:
       - app-network
 
-  # Web Server
-  nginx:
-    image: nginx:alpine
-    container_name: email_platform_nginx
+  # Web Server (Caddy)
+  caddy:
+    image: caddy:alpine
+    container_name: email_platform_caddy
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-8000}:80"
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d
-      - ./public:/app/public # Map public assets
-    depends_on:
-      - app
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./public:/app/public
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - app-network
+    depends_on:
+      - app
 
   # Background Workers (Queue & Schedule)
   worker:
@@ -62,6 +65,7 @@ services:
       POSTGRES_DB: ${DB_DATABASE:-email_platform}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -84,3 +88,5 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  caddy_data:
+  caddy_config:
